@@ -6,3 +6,5 @@ spacy
 transformers
 torch
 nltk
+protobuf
+sentencepiece
