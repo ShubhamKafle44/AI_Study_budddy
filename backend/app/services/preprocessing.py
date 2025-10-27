@@ -1,21 +1,26 @@
+# app/services/preprocessing.py
 import re
-import nltk
-from nltk.tokenize import word_tokenize
-
-nltk.download('punkt')
 
 def preprocess_text(text: str) -> str:
     """
     Clean and preprocess extracted text.
-    Steps:
-    1. Remove special characters and multiple spaces.
-    2. Lowercase text.
-    3. Tokenize text.
+    
+    Args:
+        text: Raw text string
+        
+    Returns:
+        Cleaned text string
     """
-    # Remove symbols and extra spaces
-    text = re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", text))
-    text = text.lower().strip()
-
-    # Tokenize
-    tokens = word_tokenize(text)
-    return " ".join(tokens)
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Remove special characters but keep basic punctuation
+    text = re.sub(r'[^\w\s.,!?;:\-\(\)]', '', text)
+    
+    # Remove multiple consecutive punctuation marks
+    text = re.sub(r'([.,!?;:]){2,}', r'\1', text)
+    
+    # Strip leading/trailing whitespace
+    text = text.strip()
+    
+    return text
