@@ -2,12 +2,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
-
+from app.database import engine, Base
 app = FastAPI(
     title="Study Assistant API",
     description="API for document processing, summarization, and question generation",
     version="1.0.0"
 )
+
+
+Base.metadata.create_all(bind=engine)
 
 # Add CORS middleware
 app.add_middleware(

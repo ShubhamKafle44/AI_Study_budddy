@@ -1,9 +1,13 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.services.file_handler import extract_text_from_file
 from app.services.preprocessing import preprocess_text
-from app.services.question_gen import generate_questions
 from app.services.summarization import summarize_text
-
+from app.services.question_gen import generate_questions_from_text
+from sqlalchemy.orm import Session
+from app.database import get_db 
+from app.models.quiz import Quiz, Question 
+from fastapi.responses import JSONResponse
+from fastapi import Depends
 router = APIRouter()
 
 @router.post("/upload/")
@@ -16,13 +20,13 @@ async def upload_file(file: UploadFile = File(...)):
     return {"cleaned_text": cleaned_text, "status": "success"}
 
 @router.post("/generate-questions/")
-async def get_questions(file: UploadFile = File(...)):
+async def get_questions(file: UploadFile = File(...),db: Session = Depends(get_db)):
     """
     Upload a PDF or text file, and generate quiz-style questions.
     """
     raw_text = await extract_text_from_file(file)
     cleaned_text = preprocess_text(raw_text)
-    questions = generate_questions(cleaned_text)
+    questions = generate_questions_from_text(cleaned_text)
     return {"questions": questions}
 
 @router.post("/summarize/")
@@ -43,7 +47,7 @@ async def study_file(file: UploadFile = File(...)):
     raw_text = await extract_text_from_file(file)
     cleaned_text = preprocess_text(raw_text)
     summary = summarize_text(cleaned_text)
-    questions = generate_questions(cleaned_text)
+    questions = generate_questions_from_text(cleaned_text)
     return {
         "cleaned_text": cleaned_text,
         "summary": summary,
