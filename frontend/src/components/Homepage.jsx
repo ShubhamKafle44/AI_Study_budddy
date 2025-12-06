@@ -9,7 +9,6 @@ import ResultsView from './ResultsView';
 import LoadingOverlay from './LoadingOverlay';
 import Quiz from './quiz/Quiz'; // import Quiz component
 import { API_BASE_URL } from '../config/api';
-import quizData from '../../../backend/app/core/quiz.json'
 
 export default function HomePage() {
     const [activeTab, setActiveTab] = useState('home');
