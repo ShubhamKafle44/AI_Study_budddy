@@ -2,7 +2,7 @@
 import { FileText, BookOpen, CheckSquare, Brain } from 'lucide-react';
 import ActionCard from './ActionCard';
 
-function ActionButtons({ loading, onPreprocess, onSummarize, onGenerateQuestions, onFullStudy }) {
+function ActionButtons({ loading, onPreprocess, onSummarize, onGenerateQuestions }) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <ActionCard
@@ -28,15 +28,6 @@ function ActionButtons({ loading, onPreprocess, onSummarize, onGenerateQuestions
                 onClick={onGenerateQuestions}
                 loading={loading}
                 color="purple"
-            />
-            <ActionCard
-                icon={<Brain className="w-8 h-8" />}
-                title="Full Study Mode"
-                description="Get everything at once"
-                onClick={onFullStudy}
-                loading={loading}
-                color="indigo"
-                featured
             />
         </div>
     );
