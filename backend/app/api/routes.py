@@ -53,3 +53,47 @@ async def study_file(file: UploadFile = File(...)):
         "summary": summary,
         "questions": questions
     }
+
+
+
+# ------------------------------------
+# Get all past quizzes
+# ------------------------------------
+@router.get("/pastquizzes")
+def get_past_quizzes(db: Session = Depends(get_db)):
+    quizzes = db.query(Quiz).all()
+
+    return [
+        {
+            "id": q.id,
+            "title": q.title,
+            "timeLimit": q.time_limit
+        }
+        for q in quizzes
+    ]
+
+
+# ------------------------------------
+# Get quiz with all questions
+# ------------------------------------
+@router.get("/quiz/{quiz_id}")
+def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
+    return {
+        "id": quiz.id,
+        "title": quiz.title,
+        "timeLimit": quiz.time_limit,
+        "questions": [
+            {
+                "id": q.id,
+                "text": q.text,
+                "options": q.options,
+                "correctAnswer": q.correct_answer
+            }
+            for q in quiz.questions
+        ]
+    }
