@@ -1,77 +1,122 @@
-# app/services/question_gen.py
-from transformers import pipeline
-import torch
+import os
+import requests
+import json
+from pathlib import Path
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+from app.models.quiz import Quiz, Question
+from dotenv import load_dotenv
 
-# Initialize question generation pipeline
-# Using T5 model fine-tuned for question generation
-device = 0 if torch.cuda.is_available() else -1
-question_generator = None
 
-def get_question_generator():
-    """Lazy load the question generator model."""
-    global question_generator
-    if question_generator is None:
-        question_generator = pipeline(
-            "text2text-generation",
-            model="valhalla/t5-base-qg-hl",
-            device=device
+load_dotenv()
+# Load from environment variables
+OLLAMA_URL = os.getenv("OLLAMA_URL")
+MODEL_NAME = os.getenv("OLLAMA_MODEL")
+
+def generate_questions_from_text(text: str) -> list:
+    """
+    Sends text to RunPod-Ollama and receives generated questions in JSON form.
+    """
+
+    prompt = f"""
+    You are a question generator. Read the following text and create 
+    5 multiple-choice questions in this JSON format exactly:
+
+    {{
+        "title": "Generated Quiz",
+        "time_limit": 300,
+        "questions": [
+            {{
+                "question": "...",
+                "options": ["A", "B", "C", "D"],
+                "correctAnswer": "A"
+            }}
+        ]
+    }}
+
+    Text:
+    {text}
+    """
+
+    payload = {
+        "model": MODEL_NAME,
+        "prompt": prompt,
+        "stream": False
+    }
+
+    try:
+        response = requests.post(OLLAMA_URL, json=payload)
+        response.raise_for_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ollama request failed: {str(e)}")
+
+    # Ollama returns {"response": "...text..."} so we extract that
+    output = response.json().get("response", "")
+
+    # Try to extract JSON from output
+    try:
+        quiz_json = json.loads(output)
+        return quiz_json
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=500,
+            detail="Ollama did not return valid JSON. Model output:\n" + output
         )
-    return question_generator
 
-def generate_questions(text: str, max_questions: int = 5) -> list:
+
+def save_quiz_to_db(quiz_data: dict, db: Session) -> dict:
     """
-    Generate quiz-style questions from text using Hugging Face model.
-    
-    Args:
-        text: Cleaned input text
-        max_questions: Maximum number of questions to generate
-        
-    Returns:
-        List of generated questions
+    Takes quiz JSON from the model and stores it in the database.
     """
-    generator = get_question_generator()
-    
-    # Split text into chunks if too long (model has token limits)
-    max_length = 512
-    words = text.split()
-    chunks = []
-    
-    for i in range(0, len(words), max_length):
-        chunk = " ".join(words[i:i + max_length])
-        chunks.append(chunk)
-    
-    questions = []
-    
-    # Generate questions from each chunk
-    for chunk in chunks[:3]:  # Limit to first 3 chunks to avoid too many questions
-        if len(chunk.strip()) < 50:  # Skip very short chunks
-            continue
-            
-        try:
-            # Generate question
-            result = generator(
-                chunk,
-                max_length=128,
-                num_return_sequences=min(2, max_questions - len(questions)),
-                do_sample=True,
-                top_p=0.95,
-                temperature=0.7
-            )
-            
-            for item in result:
-                question = item['generated_text'].strip()
-                if question and question not in questions:
-                    questions.append(question)
-                    
-            if len(questions) >= max_questions:
-                break
-                
-        except Exception as e:
-            print(f"Error generating questions: {e}")
-            continue
-    
-    # If no questions generated, create a fallback
+
+    title = quiz_data.get("title", "Generated Quiz")
+    time_limit = quiz_data.get("time_limit", 300)
+    questions = quiz_data.get("questions", [])
+
     if not questions:
-        questions = ["What are the main topics discussed in this text?"]
-    
-    return questions[:max_questions]
+        raise HTTPException(status_code=400, detail="No questions returned from model.")
+
+    # Create Quiz row
+    quiz = Quiz(title=title, time_limit=time_limit)
+    db.add(quiz)
+    db.commit()
+    db.refresh(quiz)
+
+    # Insert questions
+    for q in questions:
+        question_row = Question(
+            quiz_id=quiz.id,
+            text=q["question"],
+            options=[str(o) for o in q["options"]],
+            correct_answer=q["correctAnswer"]
+        )
+        db.add(question_row)
+
+    db.commit()
+
+    return {
+        "quiz_id": quiz.id,
+        "title": quiz.title,
+        "time_limit": quiz.time_limit,
+        "questions": questions
+    }
+
+
+def generate_questions(db: Session) -> dict:
+    """
+    Test mode: loads quiz.json and inserts into DB.
+    Keeps your original logic.
+    """
+    try:
+        quiz_file = Path(__file__).resolve().parents[1] / "core" / "quiz.json"
+
+        if not quiz_file.exists():
+            raise FileNotFoundError(f"{quiz_file} not found")
+
+        data = json.load(open(quiz_file, "r", encoding="utf-8"))
+
+        return save_quiz_to_db(data, db)
+
+    except Exception as e:
+        print(f"Error reading quiz.json: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
