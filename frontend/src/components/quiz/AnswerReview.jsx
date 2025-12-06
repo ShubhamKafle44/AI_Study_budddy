@@ -7,7 +7,7 @@ const AnswerReview = ({ answers, questions }) => {
             <h3 className="text-xl font-bold text-gray-800 mb-4">Answer Review</h3>
             <div className="space-y-4">
                 {questions.map((question) => {
-                    const userAnswer = answers[question.id];
+                    const userAnswer = answers[question.id]; // this should now be the string answer
                     const isCorrect = userAnswer === question.correctAnswer;
 
                     return (
@@ -22,13 +22,13 @@ const AnswerReview = ({ answers, questions }) => {
                                     <p className="font-medium text-gray-800 mb-2">{question.question}</p>
                                     <p className="text-sm text-gray-600">
                                         Your answer: <span className={isCorrect ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                                            {question.options[userAnswer]}
+                                            {userAnswer || 'No answer'}
                                         </span>
                                     </p>
                                     {!isCorrect && (
                                         <p className="text-sm text-gray-600">
                                             Correct answer: <span className="text-green-600 font-medium">
-                                                {question.options[question.correctAnswer]}
+                                                {question.correctAnswer}
                                             </span>
                                         </p>
                                     )}
